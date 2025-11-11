@@ -1,4 +1,6 @@
 from socket import *
+import ssl
+import base64
 
 # Message to send
 msg = "\r\n I love computer networks!"
@@ -6,6 +8,10 @@ endmsg = "\r\n.\r\n"
 
 # Choose a mail server (for example, Gmail)
 mailserver = ("smtp.gmail.com", 587)   # SMTP server and port
+
+# Credentials (Gmail requires App Password if 2FA enabled)
+username = "hcsarker2002@gmail.com"
+password = "xsnb urjm mwoa sjqb"
 
 # Create socket called clientSocket and establish a TCP connection with mailserver
 clientSocket = socket(AF_INET, SOCK_STREAM)
@@ -17,7 +23,7 @@ print(recv)
 if recv[:3] != '220':
     print('220 reply not received from server.')
 
-# Send HELO command and print server response
+# Send HELO command and print server response (Gmail also accepts HELO here)
 heloCommand = 'HELO Alice\r\n'
 clientSocket.send(heloCommand.encode())
 recv1 = clientSocket.recv(1024).decode()
@@ -32,11 +38,40 @@ print(recv_tls)
 if recv_tls[:3] != '220':
     print("TLS not started properly.")
 else:
-    import ssl
-    clientSocket = ssl.wrap_socket(clientSocket)
+    # Wrap socket with TLS using SNI and default CA validation
+    context = ssl.create_default_context()
+    clientSocket = context.wrap_socket(clientSocket, server_hostname=mailserver[0])
+
+    # After STARTTLS, you MUST send EHLO again to get capabilities
+    ehloCommand = 'EHLO Alice\r\n'
+    clientSocket.send(ehloCommand.encode())
+    recv_ehlo = clientSocket.recv(1024).decode()
+    print(recv_ehlo)
+    if recv_ehlo[:3] != '250':
+        print('250 reply not received from server after EHLO (post-TLS).')
+
+    # Authenticate if username/password provided (required by Gmail)
+    if username and password:
+        clientSocket.send("AUTH LOGIN\r\n".encode())
+        recv_auth = clientSocket.recv(1024).decode()
+        print(recv_auth)
+        if not recv_auth.startswith('334'):
+            print('AUTH LOGIN not accepted by server.')
+
+        clientSocket.send((base64.b64encode(username.encode()).decode() + "\r\n").encode())
+        recv_user = clientSocket.recv(1024).decode()
+        print(recv_user)
+        if not recv_user.startswith('334'):
+            print('Username not accepted.')
+
+        clientSocket.send((base64.b64encode(password.encode()).decode() + "\r\n").encode())
+        recv_pass = clientSocket.recv(1024).decode()
+        print(recv_pass)
+        if not recv_pass.startswith('235'):
+            print('235 reply not received after AUTH (authentication failed).')
 
 # Now send MAIL FROM command
-mailFrom = "MAIL FROM:<your_email@gmail.com>\r\n"
+mailFrom = f"MAIL FROM:<{username}>\r\n"
 clientSocket.send(mailFrom.encode())
 recv2 = clientSocket.recv(1024).decode()
 print(recv2)
@@ -44,7 +79,7 @@ if recv2[:3] != '250':
     print('250 reply not received from server after MAIL FROM.')
 
 # Send RCPT TO command
-rcptTo = "RCPT TO:<receiver_email@example.com>\r\n"
+rcptTo = "RCPT TO:<ug2102019@cse.pstu.ac.bd>\r\n"
 clientSocket.send(rcptTo.encode())
 recv3 = clientSocket.recv(1024).decode()
 print(recv3)
