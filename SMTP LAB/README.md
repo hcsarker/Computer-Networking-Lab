@@ -153,7 +153,7 @@ Educational lab; contributions (improved parsing, tests) are welcome. Open a PR 
 
 ## License
 
-MIT.
+MIT. [See LICENSE](../License) for details.
 
 ---
 
